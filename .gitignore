@@ -1,0 +1,23 @@
+node_modules/
+
+# Test output
+allure-results/
+allure-report/
+logs/
+.tmp/
+
+# Visual regression: baselines are committed, diffs and actuals are not
+test/baseline/**/diff/
+test/baseline/**/actual/
+
+# Large binaries - keep the APK out of git, fetch it in CI instead
+app/*.apk
+
+# Auto-downloaded by the uiautomator2 driver for hybrid/webview testing
+chromedriver-mobile/
+
+# Machine-specific paths — commit .env.example instead.
+# A committed .env is worse than none: WebdriverIO auto-loads it, so it would
+# override a correctly-set ANDROID_HOME on someone else's machine.
+.env
+.env.local
