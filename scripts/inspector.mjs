@@ -10,40 +10,16 @@
  */
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
-import { homedir, platform } from 'node:os'
-import { join } from 'node:path'
-
-function candidates () {
-    const home = homedir()
-
-    switch (platform()) {
-        case 'darwin':
-            return [
-                '/Applications/Appium Inspector.app/Contents/MacOS/Appium Inspector',
-                join(home, 'Applications', 'Appium Inspector.app', 'Contents', 'MacOS', 'Appium Inspector'),
-            ]
-        case 'win32':
-            return [
-                join(process.env.LOCALAPPDATA ?? '', 'Programs', 'Appium Inspector', 'Appium Inspector.exe'),
-                join(process.env.PROGRAMFILES ?? '', 'Appium Inspector', 'Appium Inspector.exe'),
-            ]
-        default:
-            // Ubuntu 22.04 ships only fuse3, so an AppImage extracted to a
-            // directory (AppRun) is more reliable than the .AppImage itself.
-            return [
-                join(home, 'Applications', 'appium-inspector', 'AppRun'),
-                join(home, 'Applications', 'Appium-Inspector.AppImage'),
-            ]
-    }
-}
+import { platform } from 'node:os'
+import { inspectorCandidates } from './inspector-paths.mjs'
 
 const explicit = process.env.APPIUM_INSPECTOR
-const binary = explicit ?? candidates().find((path) => path && existsSync(path))
+const binary = explicit ?? inspectorCandidates().find((path) => path && existsSync(path))
 
 if (!binary || !existsSync(binary)) {
     console.error(`
   Appium Inspector not found. Checked:
-${candidates().map((path) => `    ${path}`).join('\n')}
+${inspectorCandidates().map((path) => `    ${path}`).join('\n')}
 
   Download it from https://github.com/appium/appium-inspector/releases
   then set APPIUM_INSPECTOR to its path if you installed it elsewhere.

@@ -16,6 +16,7 @@
     "typescript": "^5.9.3"
   },
   "scripts": {
+    "setup": "node scripts/setup.mjs",
     "check:node": "node scripts/check-node.mjs",
     "fetch:app": "node scripts/fetch-app.mjs",
     "pretest": "npm run check:node",

@@ -84,6 +84,7 @@ to override.
 
 | Script | Purpose |
 |---|---|
+| `npm run setup` | one-command setup for a fresh clone (idempotent) |
 | `npm test` | run the whole suite, booting/closing an emulator if needed |
 | `npm run test:headless` | same, but boot the emulator with no window |
 | `npm run fetch:app` | download the demo APK (required after a fresh clone) |
@@ -121,7 +122,8 @@ Appium Desktop (server + inspector in one GUI) is discontinued. Inspector is now
 standalone app that connects to a server you run yourself, and capabilities use the
 W3C `appium:` vendor prefix rather than the flat Appium 1 keys.
 
-Installed at `~/Applications/appium-inspector`. Override with `APPIUM_INSPECTOR_HOME`.
+`npm run setup` installs it. Override the location with `APPIUM_INSPECTOR`, or pin a
+different release with `APPIUM_INSPECTOR_VERSION`.
 
 Three environment quirks are baked into the `inspector` script, each of which caused a
 silent failure on this machine:
@@ -179,16 +181,62 @@ session, so you test the exact selector your code will use.
 ## Setting up a fresh clone
 
 ```bash
-nvm use                 # Linux/macOS. On Windows use nvm-windows: nvm use 22.23.2
-npm ci
-cp .env.example .env    # optional; every value has a working default
-npm run fetch:app       # the APK is gitignored - this downloads it
+nvm use          # Linux/macOS. On Windows use nvm-windows: nvm use 22.23.2
+npm run setup
 npm test
 ```
 
-You also need an AVD. Nothing in the repo creates one:
+`npm run setup` does everything else: installs dependencies (Appium and the
+uiautomator2 driver come from `npm ci` — there is no global install), finds or
+installs a JDK 17, downloads the Android command-line tools, accepts the SDK
+licences, installs the SDK packages and emulator for your CPU, creates and tunes
+the `wdio_android_34` AVD, downloads the demo APK, installs Appium Inspector, and
+writes `.env` with the SDK path.
+
+It is idempotent — every step skips itself if already done, so re-run it any time
+a setup goes half-finished. On a cold machine it pulls several GB and takes a
+while; on a warm one it takes seconds.
+
+| Flag | Effect |
+|---|---|
+| `--skip-sdk` | leave the Android SDK alone (you already have one, e.g. from Android Studio) |
+| `--force-avd` | recreate the AVD even if it already exists |
+| `--skip-inspector` | skip the Appium Inspector GUI (CI has no use for a 140 MB desktop app) |
+
+The one thing it cannot do is install Node — that is the chicken-and-egg step, and
+`nvm use` has to come first.
+
+### What it picks for you
+
+- **ABI** follows your CPU: `arm64-v8a` on Apple Silicon, `x86_64` elsewhere. Using
+  the wrong one is the difference between a usable emulator and an unusable one.
+- **JDK 17+** is located rather than assumed. A stale Java 8 on `PATH` or in
+  `JAVA_HOME` is the most common reason `sdkmanager` fails, so the version is
+  checked, not just the presence of a `java` binary. On macOS with Homebrew it
+  installs `openjdk@17` if nothing suitable is found; elsewhere it prints the
+  command for your platform and stops.
+- **Appium Inspector** is installed per-user (`~/Applications` on macOS and Linux,
+  `%LOCALAPPDATA%\Programs` on Windows), so setup never needs sudo or a UAC prompt.
+  On macOS it is extracted with `ditto` rather than `unzip`, which preserves the
+  symlinks and permissions inside the `.app` bundle — `unzip` can break the code
+  signature badly enough that macOS refuses to launch it.
+- **`ANDROID_HOME` is written into `.env`**, not left to auto-detection. Every
+  script in `scripts/` finds the SDK by itself, so this looks unnecessary — but the
+  Appium server is not one of those scripts. It reads the real environment and
+  fails session creation with *"Neither ANDROID_HOME nor ANDROID_SDK_ROOT
+  environment variable was exported"*. A clone that never exported it in a shell
+  profile hits this on the first `npm test`.
+- **AVD sizing** is raised from avdmanager's defaults to 4 GB RAM and a 6 GB data
+  partition. The default 800 MB data partition is uncomfortably tight for a 118 MB
+  APK plus its install artefacts. The original `config.ini` is backed up alongside.
+
+### Doing it by hand
 
 ```bash
+npm ci
+cp .env.example .env    # then set ANDROID_HOME in it - the Appium server needs it
+npm run fetch:app       # the APK is gitignored - this downloads it
+
 sdkmanager --install "platform-tools" "emulator" "platforms;android-34" \
   "system-images;android-34;google_apis;x86_64"
 avdmanager create avd -n wdio_android_34 -k "system-images;android-34;google_apis;x86_64" -d pixel_6
